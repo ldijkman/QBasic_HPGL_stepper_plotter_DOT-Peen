@@ -8,4 +8,4 @@ a basic program reads an HPGL file and controls stepper motors on parallel port
 
 use chatgpt for conversion to serial use on arduino
 
-make your own vinyl cutter
+make your own stepper motor vinyl cutter engraving plasma cutting machine
