@@ -1,0 +1,163 @@
+'****************************************************************************
+'Copyright 12 september 1998 Luberth Dijkman  
+'qbasic plotter more @ http://home.wxs.nl/~luberth/
+'
+'Program read a HPGL file and Control's stepper motors connected to parallel port
+'4phase unipolar control like the uln2803 example
+'
+'This file is not to be sold or to be part of a commercial product
+'
+'Send me a e-mail if u like or use it!?  to luberth@wxs.nl
+'Please Send me a copy of your program if you make any changes
+'
+'Use @ own risk
+'Don't blame me if you blown your dad's brand new computer skyhigh!
+'****************************************************************************
+'                   HPGL file read and display made by James
+'****************************************************************************
+'Have fun!
+
+SCREEN 12: CLS      'screen12 and clear screen
+scale = 20          'The larger the number, the smaller the drawing on SCREEN
+
+'**********
+parport = &H378     ' maybe change this to &H278 or  &H3BC
+'**********
+'below delay vals are on a pentium 400 using quickbasic45
+'**********
+beginstepdelal = 6000    'start speed stepper slow
+endstepdelay = 1500      'end speed stepper faster
+delayminval = 1
+'*********
+
+INPUT " Tell me Path & Name of HPGL plot File  "; f$
+
+IF f$ = "" THEN END                  'if no file then end
+OPEN f$ FOR BINARY AS #1
+
+LOCATE 28, 30: PRINT "running!"
+
+MotorX(0) = 1
+MotorX(1) = 3
+MotorX(2) = 2
+MotorX(3) = 6
+MotorX(4) = 4
+MotorX(5) = 12
+MotorX(6) = 8
+MotorX(7) = 9
+
+MotorY(0) = 16
+MotorY(1) = 48
+MotorY(2) = 32
+MotorY(3) = 96
+MotorY(4) = 64
+MotorY(5) = 192
+MotorY(6) = 128
+MotorY(7) = 144
+'above lines are output valeus (half step coil firing sequence)
+
+xold = 0
+yold = 0
+
+DO WHILE NOT EOF(1)
+   
+    a$ = INPUT$(1, 1)                                   'read file 1 character
+    B$ = B$ + a$
+   
+    IF a$ = ";" THEN
+       
+	cmd$ = LEFT$(B$, 2)
+	IF cmd$ = "PU" THEN mode$ = "M"     'Move
+	IF cmd$ = "PD" THEN mode$ = "D"     'Draw
+       
+	l = LEN(B$)
+	IF l > 3 THEN
+	    IF cmd$ = "PA" OR cmd$ = "PU" OR cmd$ = "PD" THEN
+		comma = INSTR(B$, ",")
+		x$ = MID$(B$, 3, comma - 3)
+		xscreen = VAL(x$) / scale
+		x = VAL(x$)
+		y$ = MID$(B$, comma + 1, l - LEN(x$) - 4)
+		yscreen = VAL(y$) / scale
+		y = VAL(y$)
+    
+		IF mode$ = "M" THEN PSET (5 + xscreen, 475 - yscreen), 0
+		IF mode$ = "D" THEN LINE -(5 + xscreen, 475 - yscreen), 15
+	    END IF
+	END IF
+	B$ = ""
+    END IF
+   
+    xnew = x
+    ynew = y
+   
+    
+    
+    IF xnew < xold THEN xi = xold - xnew ELSE xi = xnew - xold   'this
+    IF ynew < yold THEN yi = yold - ynew ELSE yi = ynew - yold   'part
+								 'of
+    IF xi <= 0 THEN xi = yi                                      'the
+    IF yi <= 0 THEN yi = xi                                      'code
+								 'is
+    IF xi > yi THEN                                              'for
+	plusx = 1                                                'lines
+	plusy = yi / xi                                          'under
+    END IF                                                       'an
+								 'angle
+    IF yi > xi THEN                                              'other wise
+	plusx = xi / yi                                          'the
+	plusy = 1                                                'plotter
+    END IF                                                       'would
+								 'draw
+    IF yi = xi THEN                                              'lines
+	plusx = 1                                                'other
+	plusy = 1                                                'then straight
+    END IF                                                       'or 45 degree
+								 'lines wrong
+
+IF mode$ = "M" THEN OUT (parport + 2), 1 XOR 11    'if move then penup activate "strobe" pin1 parallel port
+IF mode$ = "D" THEN OUT (parport + 2), 0 XOR 11    'if pendown then output = off
+						 ' the xor 11 is because of inverted state of strobe, init, slct in
+						 ' autofeed is not inverted
+
+acceleratie = beginstepdelay                               'stepdelay
+
+stap:
+  IF INKEY$ = CHR$(27) THEN GOTO theend          'if <escape> is pressed then end program
+  
+ 
+  IF CINT(u) < x THEN u = u + plusx
+  IF CINT(u) > x THEN u = u - plusx
+  IF CINT(v) < y THEN v = v + plusy
+  IF CINT(v) > y THEN v = v - plusy
+    
+     ValeuX = CINT(u) MOD 8
+     ValeuY = CINT(v) MOD 8
+     
+     OUT (parport), (MotorX(ValeuX)) + (MotorY(ValeuY))
+     IF mode$ = "D" THEN PSET (5 + (u / scale), 475 - (v / scale)), 4 'point set at axtual xy val
+    
+     IF acceleratie < endstepdelay THEN acceleratie = endstepdelay
+     FOR N = 1 TO acceleratie: NEXT N
+     acceleratie = acceleratie - delayminval
+
+     IF xnew <> CINT(u) OR ynew <> CINT(v) THEN GOTO stap
+ 
+xold = x
+yold = y
+
+LOOP
+
+theend:
+
+OUT (parport), 0                          'turn all bits off
+OUT (parport + 2), 0 XOR 11
+CLOSE
+
+END
+
+
+
+
+
+
